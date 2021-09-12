@@ -22,6 +22,7 @@
 */
 #include <deadbeef/deadbeef.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 DB_misc_t plugin;
 //#define trace(...) { deadbeef->log ( __VA_ARGS__); }
@@ -29,6 +30,9 @@ DB_misc_t plugin;
 #define trace_err(...) { deadbeef->log ( __VA_ARGS__); }
 
 DB_functions_t *deadbeef;
+
+#define CONF_MODE_DEF 0
+#define CONF_VAL_DEF 3
 
 static int
 cust_seek_start () {
@@ -42,34 +46,31 @@ cust_seek_stop () {
 
 static int
 seek_pres (int preset_num, unsigned char forward) {
+    if (preset_num >= 10 || preset_num < 0) {
+        // not supported :)
+        return 0;
+    }
     char conf_m[] = "cust_seek.preset1";
     char conf_v[] = "cust_seek.preset1_val";
-    char conf_def = 0;
-    signed char sign = -1;
-    if (preset_num == 2) {
-        (conf_m + strlen(conf_m) - 1)[0] = '2';
-        (conf_v + strlen("cust_seek.preset"))[0] = '2';
-        conf_def = 1;
-    }
-    if (forward) {
-        sign = 1;
-    }
+    conf_m[strlen(conf_m) - 1] = preset_num;
+    conf_v[strlen(conf_m) - 1] = preset_num;
+    signed char sign = forward ? 1 : -1;
 
-    int percentage_mode = deadbeef->conf_get_int (conf_m, conf_def);
+    int percentage_mode = deadbeef->conf_get_int (conf_m, preset_num == 2 ? 1 : 0);
     trace ("%s - percentage_mode = %d", conf_m, percentage_mode);
 
     uint32_t seekval = deadbeef->streamer_get_playpos() * 1000;
     if (percentage_mode) {
-        DB_playItem_t *pl = deadbeef->streamer_get_playing_track ();
+        DB_playItem_t *pl = deadbeef->streamer_get_playing_track();
         if (pl) {
-            float amount = deadbeef->pl_get_item_duration (pl) * deadbeef->conf_get_int(conf_v, 3) / 100;
+            float amount = deadbeef->pl_get_item_duration (pl) * deadbeef->conf_get_int(conf_v, CONF_VAL_DEF) / 100;
             //trace ("amount %.4f\n", amount);
             seekval += + sign * amount * 1000;
             deadbeef->pl_item_unref (pl);
         }
     }
     else {
-        seekval += sign * deadbeef->conf_get_int(conf_v, 3) * 1000;
+        seekval += sign * deadbeef->conf_get_int(conf_v, CONF_VAL_DEF) * 1000;
     }
     trace ("resulted seek (approx.): %d ms\n", (int) seekval - (int) deadbeef->streamer_get_playpos() * 1000);
     deadbeef->sendmessage (DB_EV_SEEK, (uintptr_t) NULL, seekval, 0);
@@ -137,6 +138,36 @@ cust_seek_get_actions (DB_playItem_t *it) {
     return NULL;
 }
 
+static int cust_seek_exec_cmdline(const char *cmdline, int cmdline_size) {
+    int forward = 0;
+    if ((forward = (strcmp(cmdline, "--seek-fw") == 0)) || strcmp(cmdline, "--seek-bw") == 0) {
+        // check for arguments
+        if (strlen(cmdline)+1 < cmdline_size) {
+            const char *arg = cmdline + strlen(cmdline) + 1;
+            if (arg[strlen(arg)-1] == '%') {
+                deadbeef->conf_set_int("cust_seek.preset0", 1);
+            }
+            else {
+                 deadbeef->conf_set_int("cust_seek.preset0", 0);
+            }
+            int val = atoi(arg);
+            if (val) {
+                deadbeef->conf_set_int("cust_seek.preset0_val",val);
+                seek_pres(0,forward);
+            }
+            return 2;
+        }
+    }
+    else if ((forward = (strncmp(cmdline, "--seek-fw", 9) == 0)) || strncmp(cmdline, "--seek-bw",9) == 0) {
+        if (strlen(cmdline) == 10) {
+            int preset = cmdline[9] - '0';
+            seek_pres(preset,forward);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 
 static const char settings_dlg[] =
     "property \"Preset 1: Seconds/Percentage\" checkbox cust_seek.preset1 0;\n"
@@ -181,7 +212,8 @@ DB_misc_t plugin = {
     .plugin.start = cust_seek_start,
     .plugin.stop = cust_seek_stop,
     .plugin.configdialog = settings_dlg,
-    .plugin.get_actions = cust_seek_get_actions
+    .plugin.get_actions = cust_seek_get_actions,
+    .plugin.exec_cmdline = cust_seek_exec_cmdline
 };
 
 DB_plugin_t *
