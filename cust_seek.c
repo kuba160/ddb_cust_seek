@@ -52,8 +52,8 @@ seek_pres (int preset_num, unsigned char forward) {
     }
     char conf_m[] = "cust_seek.preset1";
     char conf_v[] = "cust_seek.preset1_val";
-    conf_m[strlen(conf_m) - 1] = preset_num;
-    conf_v[strlen(conf_m) - 1] = preset_num;
+    conf_m[strlen(conf_m) - 1] = preset_num + '0';
+    conf_v[strlen(conf_m) - 1] = preset_num + '0';
     signed char sign = forward ? 1 : -1;
 
     int percentage_mode = deadbeef->conf_get_int (conf_m, preset_num == 2 ? 1 : 0);
