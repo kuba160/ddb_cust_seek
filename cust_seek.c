@@ -23,6 +23,7 @@
 #include <deadbeef/deadbeef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 DB_misc_t plugin;
 //#define trace(...) { deadbeef->log ( __VA_ARGS__); }
@@ -138,7 +139,7 @@ cust_seek_get_actions (DB_playItem_t *it) {
     return NULL;
 }
 
-static int cust_seek_exec_cmdline(const char *cmdline, int cmdline_size) {
+static int cust_seek_exec_cmdline(const char *cmdline, int cmdline_size, int fd) {
     int forward = 0;
     if ((forward = (strcmp(cmdline, "--seek-fw") == 0)) || strcmp(cmdline, "--seek-bw") == 0) {
         // check for arguments
@@ -155,15 +156,31 @@ static int cust_seek_exec_cmdline(const char *cmdline, int cmdline_size) {
                 deadbeef->conf_set_int("cust_seek.preset0_val",val);
                 seek_pres(0,forward);
             }
-            return 2;
+            return 0;
+        }
+        else {
+            dprintf(fd, "%s requires an argument\n", cmdline);
+            return 1;
         }
     }
     else if ((forward = (strncmp(cmdline, "--seek-fw", 9) == 0)) || strncmp(cmdline, "--seek-bw",9) == 0) {
         if (strlen(cmdline) == 10) {
             int preset = cmdline[9] - '0';
             seek_pres(preset,forward);
+            return 0;
+        }
+        else {
+            dprintf(fd, "%s only supports presets from 1 to 9\n", forward ? "--seek-fw" : "--seek-bw");
             return 1;
         }
+    }
+    else if (strcmp(cmdline, "--help") == 0) {
+        dprintf (fd,"%s usage:\n", plugin.plugin.id);
+        dprintf (fd,"%-32s %s\n", "--seek-fw [NUM(%)]", "Seek forward [NUM] seconds or given percentage");
+        dprintf (fd,"%-32s %s\n", "--seek-bw [NUM(%)]", "Seek backward [NUM] seconds or given percentage");
+        dprintf (fd,"%-32s %s\n", "--seek-fw[N]", "Seek forward using settings in [N] preset");
+        dprintf (fd,"%-32s %s\n", "--seek-bw[N]", "Seek backward using settings in [N] preset");
+        dprintf (fd,"\nPreset [N] has to be between 1 and 9\n");
     }
     return 0;
 }
@@ -177,7 +194,7 @@ static const char settings_dlg[] =
 
 DB_misc_t plugin = {
     .plugin.api_vmajor = 1,
-    .plugin.api_vminor = 10,
+    .plugin.api_vminor = 15,
     .plugin.type = DB_PLUGIN_MISC,
     .plugin.version_major = 1,
     .plugin.version_minor = 0,
@@ -186,7 +203,9 @@ DB_misc_t plugin = {
     .plugin.descr = "This plugin allows you to define custom seek actions that "
                     "can be used as hotkeys.\n"
                     "You can choose between time or percentage mode.\n"
-                    "2 presets are available\n",
+                    "2 presets are available\n"
+                    "This plugin also implements newest command line api.\n"
+                    "To see command line help use: \"deadbeef --plugin=cust_seek --help\"",
     .plugin.copyright =
         "Custom Seek Hotkeys Plugin for DeaDBeeF\n"
         "Copyright (C) 2019 Jakub Wasylków <kuba_160@protonmail.com>\n"
