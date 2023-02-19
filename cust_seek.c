@@ -170,9 +170,9 @@ static int cust_seek_exec_cmdline(const char *cmdline, int cmdline_size) {
 
 
 static const char settings_dlg[] =
-    "property \"Preset 1: Seconds/Percentage\" checkbox cust_seek.preset1 0;\n"
+    "property \"Preset 1: Seek mode\"  select[2] cust_seek.preset1 0 \"Time [s]\" \"Percentage [%]\";\n"
     "property \"Preset 1 value:\" entry cust_seek.preset1_val 3;\n"
-    "property \"Preset 2: Seconds/Percentage\" checkbox cust_seek.preset2 1;\n"
+    "property \"Preset 2: Seek mode\"  select[2] cust_seek.preset2 1 \"Time [s]\" \"Percentage [%]\";\n"
     "property \"Preset 2 value:\" entry cust_seek.preset2_val 3;\n";
 
 DB_misc_t plugin = {
